@@ -215,9 +215,10 @@ function demoBanner() {
 function bindDemoBanner() {
   const b = $('#clearDemo'); if (!b) return;
   b.onclick = async () => {
-    if (!(await confirmBox('Remove the sample habits and sleep nights? Habits and nights you added yourself are kept.', 'Clear samples'))) return;
+    if (!(await confirmBox('Remove the sample habits and sleep nights? Habits, nights and focus sessions you added yourself are kept.', 'Clear samples'))) return;
     S.habits = S.habits.filter(h => !h.demo);
     S.sleep = S.sleep.filter(e => e.userMade);
+    if (S.pomo) S.pomo.sessions = S.pomo.sessions.filter(x => !x.demo);
     S.trackerDemo = false; save(); render(); toast('Fresh start — sample data cleared');
   };
 }
@@ -571,6 +572,7 @@ AFTER.sleep = () => {
   $('#sCfg').onclick = openSleepCfg;
   $$('[data-sedit]').forEach(b => b.onclick = () => openSleepEditor(S.sleep.find(e => e.id === b.dataset.sedit)));
   bindLiveSleep();
+  if (typeof pomoDashBind === 'function') pomoDashBind();
   drawCharts($('#main'));
 };
 function bindLiveSleep() {
@@ -658,7 +660,7 @@ function dashExtras() {
   const ls = last ? sleepScore(last) : null;
   const week = Array.from({ length: 7 }, (_, i) => addDays(t, i - 6)).map(d => S.sleep.find(e => e.date === d));
   const goal = S.sleepCfg.goal * 60;
-  return `
+  return `${typeof pomoDash === 'function' ? pomoDash() : ''}
     <div class="card span-7">
       <div class="card-h"><span class="card-t">${icon('flame')} Habits today ${sc ? `<span class="chip">${sc.done}/${sc.n}</span>` : ''}</span><button class="btn ghost" data-go="habits">All habits ${icon('right')}</button></div>
       ${due.length ? `<div class="dash-habits">${due.map(h => { const p = hProg(h, t); return `<button class="dh ${p >= 1 ? 'done' : ''}" data-dh="${h.id}" style="--c:${h.color}" ${tipAttr(`<b>${esc(h.name)}</b><br>${h.type === 'check' ? (p >= 1 ? 'Done ✓' : 'Tap to complete') : `${hNum(h, t)} / ${h.target} ${esc(h.unit || 'min')} · tap +${h.type === 'duration' ? 5 : 1}`}<br>🔥 ${hStreak(h)} streak`)}><span class="dh-ring">${ringSVG(p, 52, h.color, 4)}<span>${h.icon}</span></span><span class="dh-n">${esc(h.name)}</span></button>`; }).join('')}</div>` : `<div class="empty">No habits scheduled today. <a href="#habits" style="color:var(--accent)">Add one</a></div>`}

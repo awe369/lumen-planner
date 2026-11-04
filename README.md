@@ -26,6 +26,18 @@ An aesthetic, single-page productivity dashboard. Live at **https://awe369.githu
   - A 0–100 sleep score built from duration vs. goal, quality, timing and disruptions. Also: efficiency, 7-day sleep debt, a consistency score and your chronotype.
   - Charts: sleep windows against your goal window, hours asleep vs. goal, *what affects your sleep* (score with vs. without each factor), weekday averages and a 6-month score calendar. It also writes insights for you, such as social jet lag and your best and worst factors.
   - A wind-down reminder 30 minutes before your bedtime.
+- **Pomodoro timer**:
+  - Focus, short-break and long-break cycles with custom lengths and presets (25/5/15, 50/10/20, 90/15/30), auto-start options and a daily goal.
+  - +1/+5/+10 min buttons. Link a session to a to-do; each to-do shows how many 🍅 it took, and you can mark it done when the session ends.
+  - The timer keeps running when you change pages or reload. A mini timer follows you around the site and the tab title shows the countdown.
+  - Zen mode: a fullscreen timer.
+  - Box-breathing animation and break ideas during breaks, plus a one-tap "log water" button if you have a water habit.
+  - Stats: today, this week, streak and all-time. Charts show focus time over 14 days, your peak hours, and where your focus goes (by task).
+- **Soundscape mixer**: 14 sounds generated live in the browser (no audio files), so they loop seamlessly:
+  rain, thunder, wind, ocean waves, stream, fireplace, forest birds, night crickets, clock, ambient pad, white/pink/brown noise and binaural focus beats.
+  - Each sound has its own volume slider, and a master volume sits on top.
+  - Presets: Rainy day, Cozy cabin, Seaside, Forest, Summer night, Deep focus, Dreamy.
+  - The mix can start automatically with focus sessions and quiets down during breaks.
 - **Focus mode**: a full-screen countdown for the current block (complete / +15 min / skip), or a free Pomodoro timer.
 - Light and dark themes, accent colours, 12/24-hour clock, and JSON backup export/import.
 
@@ -35,7 +47,7 @@ Available types: bars, line, area, step line, lollipop, radial, donut, heatmap, 
 16 charts across the Dashboard, Habits and Sleep pages, each with 2–5 types. Hover any mark for exact values.
 
 ## Keyboard
-`1`–`6` switch views · `Q` quick add · `F` focus · in Time Blocks: `N` new block, `T` today, `←/→` move between days, `W` switch between day and week.
+`1`–`7` switch views · `Q` quick add · `F` focus · in Time Blocks: `N` new block, `T` today, `←/→` move between days, `W` switch between day and week · in Pomodoro: `Space` start/pause, `S` skip, `R` reset, `Esc` leave zen mode.
 
 ## Data
 Everything is stored in your browser's `localStorage`. Nothing is sent anywhere. Use **Settings → Export backup** to keep a copy or move to another device.

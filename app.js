@@ -506,6 +506,7 @@ function todoItem(t) {
         ${t.est ? `<span class="chip">${icon('clock')} ${durStr(t.est)}</span>` : ''}
         ${scheduled ? `<span class="chip on">${icon('blocks')} scheduled</span>` : ''}
         ${(t.subs || []).length ? `<span class="chip">${subsDone}/${t.subs.length} steps</span>` : ''}
+        ${t.pomos ? `<span class="chip">🍅 ${t.pomos}</span>` : ''}
       </div>
       ${(t.subs || []).length ? `<div class="subs">${t.subs.map(s => `<label class="sub ${s.done ? 'done' : ''}"><input type="checkbox" class="chk" data-sub="${s.id}" ${s.done ? 'checked' : ''}><span>${esc(s.text)}</span></label>`).join('')}</div>` : ''}
     </div>
@@ -1314,7 +1315,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { if ($('#modalRoot').innerHTML) $('#modalRoot').innerHTML = ''; else if (focus.on) closeFocus(); return; }
   if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) || e.metaKey || e.ctrlKey || e.altKey || $('#modalRoot').innerHTML || focus.on) return;
   const k = e.key.toLowerCase();
-  const order = ['dashboard', 'todo', 'planner', 'blocker', 'habits', 'sleep'];
+  const order = ['dashboard', 'todo', 'planner', 'blocker', 'habits', 'sleep', 'pomodoro'];
   if (k >= '1' && k <= String(order.length) && k.length === 1) return go(order[+k - 1]);
   if (k === 'f') return openFocus();
   if (k === 'q') return quickAdd();
