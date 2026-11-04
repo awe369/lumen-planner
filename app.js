@@ -156,6 +156,9 @@ function load() {
   return seed(defaultState());
 }
 let S = load();
+// other modules (trackers.js) push data migrations here; run at boot, import and reset
+const MIGRATIONS = [];
+const migrate = s => { MIGRATIONS.forEach(f => f(s)); return s; };
 let saveTimer;
 function save() {
   clearTimeout(saveTimer);
@@ -443,6 +446,7 @@ function renderDashboard() {
       ${S.monthFocus[mKey] ? `<p style="font-family:var(--serif);font-size:20px;margin:0 0 10px">“${esc(S.monthFocus[mKey])}”</p>` : ''}
       ${mGoals.length ? `<div class="bar" style="margin-bottom:10px"><i style="width:${(mGoals.filter(g => g.done).length / mGoals.length) * 100}%"></i></div>` + mGoals.slice(0, 5).map(g => `<div class="goal ${g.done ? 'done' : ''}"><input type="checkbox" class="chk" data-mgoal="${g.id}" ${g.done ? 'checked' : ''}><span>${esc(g.text)}</span></div>`).join('') : '<div class="empty">No goals set for this month yet.</div>'}
     </div>
+    ${typeof dashExtras === 'function' ? dashExtras() : ''}
   </div>`;
 }
 AFTER.dashboard = () => {
@@ -461,6 +465,7 @@ AFTER.dashboard = () => {
     const now = new Date(), key = `${now.getFullYear()}-${now.getMonth()}`;
     const g = (S.monthGoals[key] || []).find(x => x.id === c.dataset.mgoal); if (g) g.done = c.checked; save(); render();
   });
+  if (typeof afterDashExtras === 'function') afterDashExtras();
   tick();
 };
 function quickAdd() {
@@ -1254,9 +1259,9 @@ function openSettings() {
     };
     $('#stImport', m).onchange = e => {
       const f = e.target.files[0]; if (!f) return;
-      f.text().then(txt => { try { const d = JSON.parse(txt); if (!d.todos || !d.blocks) throw 0; S = { ...defaultState(), ...d, settings: { ...defaultState().settings, ...d.settings } }; save(); close(); applyTheme(); render(); toast('Backup imported'); } catch (err) { toast('That file is not a Lumen backup'); } });
+      f.text().then(txt => { try { const d = JSON.parse(txt); if (!d.todos || !d.blocks) throw 0; S = migrate({ ...defaultState(), ...d, settings: { ...defaultState().settings, ...d.settings } }); save(); close(); applyTheme(); render(); toast('Backup imported'); } catch (err) { toast('That file is not a Lumen backup'); } });
     };
-    $('#stReset', m).onclick = async () => { close(); if (await confirmBox('This erases all tasks, blocks, goals and settings in this browser.', 'Erase everything')) { localStorage.removeItem(STORE_KEY); S = seed(defaultState()); save(); applyTheme(); render(); toast('Fresh start'); } };
+    $('#stReset', m).onclick = async () => { close(); if (await confirmBox('This erases all tasks, blocks, goals and settings in this browser.', 'Erase everything')) { localStorage.removeItem(STORE_KEY); S = migrate(seed(defaultState())); save(); applyTheme(); render(); toast('Fresh start'); } };
     $('#stSave', m).onclick = () => {
       const st = +$('#stStart', m).value, en = +$('#stEnd', m).value;
       Object.assign(s, { name: $('#stName', m).value.trim(), dayStart: st, dayEnd: Math.max(en, st + 6), snap: +$('#stSnap', m).value, h24: $('#stH24', m).value === '1', pomodoro: +$('#stPomo', m).value, accent, sound: $('#stSound', m).checked, notify: $('#stNotify', m).checked });
@@ -1312,7 +1317,8 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { if ($('#modalRoot').innerHTML) $('#modalRoot').innerHTML = ''; else if (focus.on) closeFocus(); return; }
   if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) || e.metaKey || e.ctrlKey || e.altKey || $('#modalRoot').innerHTML || focus.on) return;
   const k = e.key.toLowerCase();
-  if (['1', '2', '3', '4'].includes(k)) return go(['dashboard', 'todo', 'planner', 'blocker'][+k - 1]);
+  const order = ['dashboard', 'todo', 'planner', 'blocker', 'habits', 'sleep'];
+  if (k >= '1' && k <= String(order.length) && k.length === 1) return go(order[+k - 1]);
   if (k === 'f') return openFocus();
   if (k === 'q') return quickAdd();
   if (ui.view === 'blocker') {
@@ -1331,7 +1337,11 @@ $('#settingsBtn').onclick = openSettings;
 $('#themeBtn').onclick = () => { S.settings.theme = S.settings.theme === 'dark' ? 'light' : 'dark'; save(); applyTheme(); };
 window.addEventListener('hashchange', () => go(location.hash.slice(1)));
 
-hydrateIcons();
-applyTheme();
-save();
-go(location.hash.slice(1) || ui.view);
+// boot once every module script has loaded
+document.addEventListener('DOMContentLoaded', () => {
+  S = migrate(S);
+  hydrateIcons();
+  applyTheme();
+  save();
+  go(location.hash.slice(1) || ui.view);
+});
