@@ -29,6 +29,11 @@ An aesthetic, single-page productivity dashboard. Live at **https://awe369.githu
 - **Focus mode**: a full-screen countdown for the current block (complete / +15 min / skip), or a free Pomodoro timer.
 - Light and dark themes, accent colours, 12/24-hour clock, and JSON backup export/import.
 
+## Charts
+Every chart has a **type picker** in its header, plus a 🔀 shuffle button. Your choice is remembered for each chart.
+Available types: bars, line, area, step line, lollipop, radial, donut, heatmap, range bars, dumbbell, multi-line (click legend items to hide/show series), small multiples, grouped bars, diverging bars and horizontal bars.
+16 charts across the Dashboard, Habits and Sleep pages, each with 2–5 types. Hover any mark for exact values.
+
 ## Keyboard
 `1`–`6` switch views · `Q` quick add · `F` focus · in Time Blocks: `N` new block, `T` today, `←/→` move between days, `W` switch between day and week.
 

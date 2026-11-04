@@ -608,3 +608,61 @@ button.chip { cursor: pointer; }
   .day-pill { font-size: 10px; padding: 4px 0; }
   .day-pill .dp-ring svg { width: 32px; height: 32px; }
 }
+
+/* ============ Chart-type picker & new chart pieces ============ */
+.ct-wrap { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ct-note { font-size: 12px; color: var(--faint); white-space: nowrap; }
+.ctype { display: inline-flex; padding: 3px; gap: 2px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); flex: none; }
+.ctype button { width: 28px; height: 26px; display: grid; place-items: center; border-radius: 7px; color: var(--faint); transition: color .2s, background .2s, transform .15s; }
+.ctype button svg { width: 15px; height: 15px; }
+.ctype button:hover { color: var(--text); background: var(--surface-2); }
+.ctype button.on { color: var(--accent); background: var(--surface-2); box-shadow: 0 1px 2px rgba(0,0,0,.18); }
+.ctype .ct-sh { margin-left: 2px; border-left: 1px solid var(--border); border-radius: 0 7px 7px 0; }
+.ctype .ct-sh:active svg { transform: rotate(180deg); transition: transform .3s; }
+.sub-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 18px 0 8px; }
+.viz text.d-big { fill: var(--text); font-family: var(--serif); font-size: 34px; }
+.clegend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+.clegend > * { display: inline-flex; align-items: center; gap: 6px; }
+.clegend i { width: 12px; height: 12px; border-radius: 4px; flex: none; }
+.clegend button { padding: 3px 8px; border-radius: 8px; color: var(--text); transition: opacity .2s, background .2s; }
+.clegend button:hover { background: var(--surface-2); }
+.clegend button.off { opacity: .4; text-decoration: line-through; }
+.clegend .lg-goal, .clegend .lg-seq { display: inline-block; height: 12px; margin: 0; }
+.tdot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+.donut-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.donut-wrap.side { flex-direction: row; align-items: center; gap: 22px; }
+.dlegend { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; width: 100%; }
+.dlegend > div { display: grid; grid-template-columns: 12px 1fr auto 44px; align-items: center; gap: 10px; font-size: 13px; padding: 4px 6px; border-radius: 8px; }
+.dlegend > div:hover { background: var(--surface-2); }
+.dlegend i { width: 12px; height: 12px; border-radius: 4px; }
+.dlegend span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dlegend em { font-style: normal; color: var(--faint); text-align: right; font-size: 12px; }
+.viz .slice { transition: transform .2s; transform-box: fill-box; transform-origin: center; }
+.viz .slice:hover { transform: scale(1.04); }
+.smalls { display: grid; gap: 10px; }
+.sm { padding: 12px; border-radius: 14px; background: var(--surface-2); min-width: 0; }
+.sm-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; margin-bottom: 6px; }
+.sm-h span { display: flex; align-items: center; gap: 6px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sm-h i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.sm-h b { font-family: var(--serif); font-weight: 400; font-size: 20px; }
+.sm-f { font-size: 11px; color: var(--faint); margin-top: 4px; }
+
+/* entrance animations: only on navigation / type switch (.anim), never on the minute refresh */
+@media (prefers-reduced-motion: no-preference) {
+  .anim .viz .draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: drawIn .9s cubic-bezier(.3,.7,.2,1) forwards; }
+  .anim .viz .grow { transform-box: fill-box; transform-origin: 50% 100%; animation: growY .55s cubic-bezier(.2,.8,.2,1) both; }
+  .anim .viz .grow-x { transform-box: fill-box; transform-origin: 0 50%; animation: growX .55s cubic-bezier(.2,.8,.2,1) both; }
+  .anim .viz .pop { transform-box: fill-box; transform-origin: center; animation: popIn .45s cubic-bezier(.3,1.4,.5,1) both; }
+  .anim .viz .fade, .anim .viz .hm { animation: fadeIn .7s both; }
+  .anim .smalls, .anim .dlegend, .anim .clegend { animation: fadeIn .5s both; }
+}
+@keyframes drawIn { to { stroke-dashoffset: 0; } }
+@keyframes growY { from { transform: scaleY(0); } }
+@keyframes growX { from { transform: scaleX(0); } }
+@keyframes popIn { from { transform: scale(0); opacity: 0; } }
+@keyframes fadeIn { from { opacity: 0; } }
+@media (max-width: 760px) {
+  .card-h { flex-wrap: wrap; }
+  .ct-note { display: none; }
+  .ctype button { width: 26px; }
+}

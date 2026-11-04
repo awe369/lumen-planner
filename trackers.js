@@ -203,92 +203,6 @@ function hTap(h, d) { if (hSkip(h, d)) delete h.log[d]; hSet(h, d, hDone(h, d) ?
 function hStep(h, d, dir) { const step = h.type === 'duration' ? 5 : 1; hSet(h, d, Math.max(0, hNum(h, d) + dir * step)); }
 
 /* =========================================================
-   CHART KIT — drawn at the container's real pixel width
-   ========================================================= */
-const CHARTS = {};
-function drawCharts(root = document) {
-  $$('[data-chart]', root).forEach(el => {
-    const fn = CHARTS[el.dataset.chart];
-    if (fn) { try { el.innerHTML = fn(Math.max(240, el.clientWidth), el.dataset.arg); } catch (e) { console.error(e); } }
-  });
-}
-let resizeT;
-window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => drawCharts(), 150); });
-const svgWrap = (w, h, inner) => `<svg class="viz" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img">${inner}</svg>`;
-const tipAttr = html => `data-tip="${esc(html)}"`;
-/* sequential: one hue (accent), light → dark via mix with the surface */
-const seq = (v, hue = 'var(--accent)') => v == null ? 'var(--surface-2)' : `color-mix(in srgb, ${hue} ${Math.round(18 + v * 82)}%, var(--surface-2))`;
-
-function heatmapSVG(width, { weeks, end = todayStr(), val, hue, tip, cell = 13 }) {
-  const gap = 3, padL = 26, padT = 16;
-  const cs = Math.max(6, Math.min(cell, Math.floor((width - padL) / weeks) - gap));
-  weeks = Math.min(weeks, Math.floor((width - padL) / (cs + gap)));
-  const start = addDays(weekStart(end), -(weeks - 1) * 7);
-  let cells = '', months = '', lastM = -1;
-  for (let w = 0; w < weeks; w++) {
-    const ws = addDays(start, w * 7), m = parse(ws).getMonth();
-    if (m !== lastM) { months += `<text x="${padL + w * (cs + gap)}" y="10">${MONTHS[m].slice(0, 3)}</text>`; lastM = m; }
-    for (let r = 0; r < 7; r++) {
-      const d = addDays(ws, r); if (d > end) continue;
-      const v = val(d);
-      cells += `<rect class="hm" x="${padL + w * (cs + gap)}" y="${padT + r * (cs + gap)}" width="${cs}" height="${cs}" rx="${Math.min(3, cs / 3)}" fill="${seq(v, hue)}" ${v == null ? 'opacity=".55"' : ''} ${tipAttr(tip(d, v))}/>`;
-    }
-  }
-  const dl = ['Mon', '', 'Wed', '', 'Fri', '', ''].map((t, r) => t ? `<text x="0" y="${padT + r * (cs + gap) + cs - 2}">${t}</text>` : '').join('');
-  const H = padT + 7 * (cs + gap);
-  return svgWrap(width, H, months + dl + cells) +
-    `<div class="hm-legend"><span>Less</span>${[0, .25, .5, .75, 1].map(v => `<i style="background:${seq(v, hue)}"></i>`).join('')}<span>More</span></div>`;
-}
-function lineSVG(width, { pts, hue = 'var(--accent)', height = 180, yMax = 1, fmtY = v => Math.round(v * 100) + '%', ticks = [0, .5, 1] }) {
-  const padL = 38, padR = 10, padT = 12, padB = 24, w = width - padL - padR, h = height - padT - padB;
-  if (!pts.length) return '<div class="empty">Not enough data yet.</div>';
-  const x = i => padL + (pts.length < 2 ? w / 2 : (i / (pts.length - 1)) * w), y = v => padT + h - (v / yMax) * h;
-  const grid = ticks.map(t => `<line class="g" x1="${padL}" x2="${padL + w}" y1="${y(t * yMax)}" y2="${y(t * yMax)}"/><text x="${padL - 6}" y="${y(t * yMax) + 4}" text-anchor="end">${fmtY(t * yMax)}</text>`).join('');
-  const d = pts.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join('');
-  const area = `${d}L${x(pts.length - 1)},${padT + h}L${x(0)},${padT + h}Z`;
-  const gid = 'lg' + uid();
-  const step = Math.max(1, Math.ceil(pts.length / Math.max(2, Math.floor(w / 70))));
-  const xl = pts.map((p, i) => i % step === 0 ? `<text x="${x(i)}" y="${height - 6}" text-anchor="middle">${p.label}</text>` : '').join('');
-  const bw = w / Math.max(1, pts.length - 1);
-  const hits = pts.map((p, i) => `<g class="hitg" ${tipAttr(p.tip)}><rect class="hit" x="${x(i) - bw / 2}" y="${padT}" width="${bw}" height="${h}"/><line class="xh" x1="${x(i)}" x2="${x(i)}" y1="${padT}" y2="${padT + h}"/><circle class="xd" cx="${x(i)}" cy="${y(p.v)}" r="4.5" fill="${hue}"/></g>`).join('');
-  const last = pts[pts.length - 1];
-  return svgWrap(width, height, `<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${hue}" stop-opacity=".28"/><stop offset="1" stop-color="${hue}" stop-opacity="0"/></linearGradient></defs>${grid}${xl}<path d="${area}" fill="url(#${gid})"/><path d="${d}" fill="none" stroke="${hue}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${x(pts.length - 1)}" cy="${y(last.v)}" r="4" fill="${hue}" stroke="var(--surface-solid)" stroke-width="2"/><text class="dl" x="${x(pts.length - 1) - 8}" y="${y(last.v) - 9}" text-anchor="end">${fmtY(last.v)}</text>${hits}`);
-}
-function barsSVG(width, { bars, height = 180, yMax, fmtY, ticks, goal, goalLabel, hueFn }) {
-  const padL = 38, padR = 10, padT = 14, padB = 24, w = width - padL - padR, h = height - padT - padB;
-  if (!bars.length) return '<div class="empty">Not enough data yet.</div>';
-  const slot = w / bars.length, bw = Math.max(4, Math.min(28, slot - Math.max(2, slot * .35)));
-  const y = v => padT + h - (v / yMax) * h;
-  const grid = ticks.map(t => `<line class="g" x1="${padL}" x2="${padL + w}" y1="${y(t)}" y2="${y(t)}"/><text x="${padL - 6}" y="${y(t) + 4}" text-anchor="end">${fmtY(t)}</text>`).join('');
-  const step = Math.max(1, Math.ceil(bars.length / Math.max(2, Math.floor(w / 34))));
-  const body = bars.map((b, i) => {
-    const cx = padL + slot * i + slot / 2, top = y(Math.min(b.v, yMax)), bh = Math.max(0, padT + h - top);
-    const r = Math.min(4, bw / 2, bh);
-    const path = bh > 0 ? `M${cx - bw / 2},${padT + h}V${top + r}Q${cx - bw / 2},${top} ${cx - bw / 2 + r},${top}H${cx + bw / 2 - r}Q${cx + bw / 2},${top} ${cx + bw / 2},${top + r}V${padT + h}Z` : '';
-    return `<g class="hitg" ${tipAttr(b.tip)}><rect class="hit" x="${padL + slot * i}" y="${padT}" width="${slot}" height="${h}"/><path d="${path}" fill="${hueFn ? hueFn(b) : 'var(--accent)'}"/>${i % step === 0 ? `<text x="${cx}" y="${height - 6}" text-anchor="middle">${b.label}</text>` : ''}</g>`;
-  }).join('');
-  const gl = goal != null ? `<line class="goal" x1="${padL}" x2="${padL + w}" y1="${y(goal)}" y2="${y(goal)}"/><text class="dl" x="${padL + w}" y="${y(goal) - 5}" text-anchor="end">${goalLabel}</text>` : '';
-  return svgWrap(width, height, grid + body + gl);
-}
-/* hover tooltip for every [data-tip] mark */
-(() => {
-  let tip;
-  document.addEventListener('pointermove', e => {
-    tip = tip || $('#tip');
-    const t = e.target.closest && e.target.closest('[data-tip]');
-    if (!t || !tip) { if (tip) tip.hidden = true; return; }
-    tip.innerHTML = t.getAttribute('data-tip');
-    tip.hidden = false;
-    const r = tip.getBoundingClientRect();
-    let x = e.clientX + 14, y = e.clientY + 14;
-    if (x + r.width > innerWidth - 8) x = e.clientX - r.width - 14;
-    if (y + r.height > innerHeight - 8) y = e.clientY - r.height - 14;
-    tip.style.transform = `translate(${x}px, ${y}px)`;
-  });
-  document.addEventListener('pointerdown', () => { if (tip) tip.hidden = true; });
-})();
-
-/* =========================================================
    HABITS VIEW
    ========================================================= */
 function ringSVG(p, size, color, stroke = 4) {
@@ -382,44 +296,16 @@ function habitGrid(list) {
 function habitInsights(list) {
   const ranked = list.map(h => ({ h, s: hStrength(h), r: hRate(h, 30), b: hBest(h) })).sort((a, b) => b.s - a.s);
   return `<div class="dash">
-    <div class="card span-12"><div class="card-h"><span class="card-t">${icon('grid')} Your year in habits</span><span class="faint" style="font-size:12px">daily completion of scheduled habits</span></div><div data-chart="habitYear"></div></div>
-    <div class="card span-7"><div class="card-h"><span class="card-t">${icon('chart')} Completion · last 60 days</span><span class="faint" style="font-size:12px">7-day rolling average</span></div><div data-chart="habitTrend"></div></div>
-    <div class="card span-5"><div class="card-h"><span class="card-t">${icon('calendar')} Best days of the week</span></div><div data-chart="habitDow"></div></div>
+    <div class="card span-12">${chartHead('habitYear', 'Your year in habits', 'grid', 'daily completion of scheduled habits')}<div data-chart="habitYear"></div></div>
+    <div class="card span-7">${chartHead('habitTrend', 'Completion · last 60 days', 'chart', '7-day rolling avg')}<div data-chart="habitTrend"></div></div>
+    <div class="card span-5">${chartHead('habitDow', 'Best days of the week', 'calendar')}<div data-chart="habitDow"></div></div>
+    <div class="card span-7">${chartHead('habitCompare', 'Habit strength · all habits', 'flame', '90 days')}<div data-chart="habitCompare"></div></div>
+    <div class="card span-5">${chartHead('habitMix', 'Check-ins by habit', 'target', '30 days')}<div data-chart="habitMix"></div></div>
     <div class="card span-12"><div class="card-h"><span class="card-t">${icon('flame')} Leaderboard</span><span class="faint" style="font-size:12px">strength = momentum that rewards consistency and forgives a single miss</span></div>
       <div class="lb">${ranked.map(({ h, s, r, b }, i) => `<button class="lb-row" data-hopen-id="${h.id}"><span class="lb-rank">${i + 1}</span><span class="h-ico sm" style="--c:${h.color}">${h.icon}</span><span class="lb-name">${esc(h.name)}<small>${schedText(h)}</small></span><div class="bar lb-bar"><i style="width:${s * 100}%;background:${h.color}"></i></div><span class="lb-v"><b>${Math.round(s * 100)}%</b><small>strength</small></span><span class="lb-v"><b>${Math.round(r * 100)}%</b><small>30-day</small></span><span class="lb-v"><b>${hStreak(h)}</b><small>streak</small></span><span class="lb-v"><b>${b}</b><small>best</small></span></button>`).join('')}</div>
     </div>
   </div>`;
 }
-CHARTS.habitYear = w => heatmapSVG(w, { weeks: 53, val: d => { const s = dayScore(d); return s ? s.v : null; }, tip: (d, v) => `<b>${niceDate(d, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</b><br>${v == null ? 'No habits scheduled' : `${Math.round(v * 100)}% · ${dayScore(d).done}/${dayScore(d).n} done`}` });
-CHARTS.habitTrend = w => {
-  const t = todayStr(), raw = Array.from({ length: 66 }, (_, i) => { const d = addDays(t, i - 65); const s = dayScore(d); return { d, v: s ? s.v : null }; });
-  const pts = [];
-  for (let i = 6; i < raw.length; i++) {
-    const win = raw.slice(i - 6, i + 1).filter(x => x.v != null);
-    if (!win.length) continue;
-    const v = win.reduce((a, x) => a + x.v, 0) / win.length;
-    pts.push({ v, label: niceDate(raw[i].d, { month: 'short', day: 'numeric' }), tip: `<b>${niceDate(raw[i].d, { weekday: 'short', month: 'short', day: 'numeric' })}</b><br>7-day avg ${Math.round(v * 100)}%${raw[i].v != null ? `<br>that day ${Math.round(raw[i].v * 100)}%` : ''}` });
-  }
-  return lineSVG(w, { pts, height: 200 });
-};
-CHARTS.habitDow = w => {
-  const acc = Array.from({ length: 7 }, () => ({ s: 0, n: 0 })), t = todayStr();
-  for (let i = 1; i <= 90; i++) { const d = addDays(t, -i), s = dayScore(d); if (s) { const k = (parse(d).getDay() + 6) % 7; acc[k].s += s.v; acc[k].n++; } }
-  const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const vals = acc.map(a => a.n ? a.s / a.n : 0), best = Math.max(...vals);
-  return barsSVG(w, { bars: vals.map((v, i) => ({ v, label: names[i], tip: `<b>${names[i]}</b><br>${Math.round(v * 100)}% avg completion<br><span class="faint">last 90 days</span>`, best: v === best })), yMax: 1, ticks: [0, .5, 1], fmtY: v => Math.round(v * 100) + '%', height: 200, hueFn: b => b.best ? 'var(--accent)' : 'color-mix(in srgb, var(--accent) 45%, var(--surface-2))' });
-};
-CHARTS.habitOneYear = (w, id) => { const h = S.habits.find(x => x.id === id); return heatmapSVG(w, { weeks: 26, hue: h.color, cell: 15, val: d => !hDue(h, d) ? null : hSkip(h, d) ? null : hProg(h, d), tip: (d, v) => `<b>${niceDate(d, { weekday: 'short', month: 'short', day: 'numeric' })}</b><br>${hSkip(h, d) ? 'Skipped' : !hDue(h, d) ? 'Not scheduled' : h.type === 'check' ? (v >= 1 ? 'Done ✓' : 'Missed') : `${hNum(h, d)} / ${h.target} ${esc(h.unit || 'min')}`}` }); };
-CHARTS.habitStrength = (w, id) => {
-  const h = S.habits.find(x => x.id === id), ser = hStrengthSeries(h).slice(-120);
-  return lineSVG(w, { hue: h.color, height: 170, pts: ser.map(p => ({ v: p.s, label: niceDate(p.d, { month: 'short', day: 'numeric' }), tip: `<b>${niceDate(p.d, { month: 'short', day: 'numeric' })}</b><br>strength ${Math.round(p.s * 100)}%` })) });
-};
-CHARTS.habitOneDow = (w, id) => {
-  const h = S.habits.find(x => x.id === id), t = todayStr(), acc = Array.from({ length: 7 }, () => ({ d: 0, n: 0 }));
-  for (let i = 1; i <= 120; i++) { const d = addDays(t, -i); if (d < h.created) break; if (!hDue(h, d) || hSkip(h, d)) continue; if (h.freq === 'weekly' && !hDone(h, d)) { acc[(parse(d).getDay() + 6) % 7].n++; continue; } const k = (parse(d).getDay() + 6) % 7; acc[k].n++; if (hDone(h, d)) acc[k].d++; }
-  const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  return barsSVG(w, { height: 150, bars: acc.map((a, i) => ({ v: a.n ? a.d / a.n : 0, label: names[i], tip: `<b>${names[i]}</b><br>${a.d} of ${a.n} ${h.freq === 'weekly' ? 'days active' : 'done'}` })), yMax: 1, ticks: [0, .5, 1], fmtY: v => Math.round(v * 100) + '%', hueFn: () => h.color });
-};
 AFTER.habits = () => {
   bindDemoBanner();
   $$('[data-htab]').forEach(b => b.onclick = () => { ui.hTab = b.dataset.htab; saveUI(); render(); });
@@ -470,10 +356,10 @@ function openHabitDetail(h) {
       <div><span>Strength</span><b>${Math.round(str * 100)}<small>%</small></b></div>
       <div><span>Total done</span><b>${tot}</b></div>
     </div>
-    <div class="lbl-sm" style="margin:18px 0 8px">Last 6 months</div><div data-chart="habitOneYear" data-arg="${h.id}"></div>
+    <div class="sub-h"><span class="lbl-sm">Last 6 months</span>${chartPicker('habitOneYear')}</div><div data-chart="habitOneYear" data-arg="${h.id}"></div>
     <div class="two-col">
-      <div><div class="lbl-sm" style="margin:18px 0 8px">Strength over time</div><div data-chart="habitStrength" data-arg="${h.id}"></div></div>
-      <div><div class="lbl-sm" style="margin:18px 0 8px">By weekday</div><div data-chart="habitOneDow" data-arg="${h.id}"></div></div>
+      <div><div class="sub-h"><span class="lbl-sm">Strength over time</span>${chartPicker('habitStrength')}</div><div data-chart="habitStrength" data-arg="${h.id}"></div></div>
+      <div><div class="sub-h"><span class="lbl-sm">By weekday</span>${chartPicker('habitOneDow')}</div><div data-chart="habitOneDow" data-arg="${h.id}"></div></div>
     </div>
     ${notes.length ? `<div class="lbl-sm" style="margin:18px 0 8px">Recent notes</div>${notes.map(([d, n]) => `<div class="note-row"><span class="faint">${relDate(d)}</span><span>${esc(n)}</span></div>`).join('')}` : ''}
     <div class="modal-foot"><div class="row"><button class="btn danger" id="hdDel">${icon('trash')} Delete</button><button class="btn" id="hdArc">${icon('archive')} ${h.archived ? 'Restore' : 'Archive'}</button></div><button class="btn primary" id="hdEdit">${icon('edit')} Edit habit</button></div>`, (m, close) => {
@@ -665,74 +551,19 @@ function renderSleep() {
       <div class="card"><span class="stat-k">Chronotype</span><div class="stat-v sm">${ct ? ct[0] : '—'}</div><span class="faint">${ct ? `mid-sleep ≈ ${timeOf(s.mid + 1440)}` : 'needs more nights'}</span></div>
     </div>
 
-    <div class="card span-12"><div class="card-h"><span class="card-t">${icon('clock')} Sleep windows</span><span class="legend"><i class="lg-goal"></i>goal window <i class="lg-seq"></i>darker = better score</span></div><div data-chart="sleepWin"></div></div>
-    <div class="card span-7"><div class="card-h"><span class="card-t">${icon('chart')} Hours asleep</span><span class="legend"><i class="lg-line"></i>${S.sleepCfg.goal}h goal</span></div><div data-chart="sleepDur"></div></div>
-    <div class="card span-5"><div class="card-h"><span class="card-t">${icon('sparkle')} What affects your sleep</span><span class="faint" style="font-size:12px">score vs. nights without</span></div><div data-chart="sleepFactors"></div></div>
-    <div class="card span-5"><div class="card-h"><span class="card-t">${icon('calendar')} By weekday</span><span class="faint" style="font-size:12px">avg hours · last 60d</span></div><div data-chart="sleepDow"></div></div>
+    <div class="card span-12">${chartHead('sleepWin', 'Sleep windows', 'clock')}<div data-chart="sleepWin"></div></div>
+    <div class="card span-7">${chartHead('sleepDur', 'Hours asleep', 'chart')}<div data-chart="sleepDur"></div></div>
+    <div class="card span-5">${chartHead('sleepFactors', 'What affects your sleep', 'sparkle', 'score vs. nights without')}<div data-chart="sleepFactors"></div></div>
+    <div class="card span-7">${chartHead('sleepScore', 'Sleep score trend', 'moon')}<div data-chart="sleepScore"></div></div>
+    <div class="card span-5">${chartHead('sleepMix', 'How your nights rate', 'target')}<div data-chart="sleepMix"></div></div>
+    <div class="card span-5">${chartHead('sleepDow', 'By weekday', 'calendar', 'avg hours · 60d')}<div data-chart="sleepDow"></div></div>
     <div class="card span-7"><div class="card-h"><span class="card-t">${icon('wand')} Insights</span></div><ul class="insights">${sleepInsights(list).map(x => `<li>${x}</li>`).join('')}</ul>${ct ? `<div class="faint" style="font-size:12.5px;margin-top:8px">${ct[1]}</div>` : ''}</div>
-    <div class="card span-12"><div class="card-h"><span class="card-t">${icon('grid')} Sleep score calendar</span><span class="faint" style="font-size:12px">last 6 months</span></div><div data-chart="sleepCal"></div></div>
+    <div class="card span-12">${chartHead('sleepCal', 'Sleep score calendar', 'grid', 'last 6 months')}<div data-chart="sleepCal"></div></div>
     <div class="card span-12"><div class="card-h"><span class="card-t">${icon('note')} Sleep log</span><span class="faint">${all.length} nights</span></div>
       <div class="slog">${all.slice(0, 21).map(e => { const sc = sleepScore(e); return `<button class="slog-row" data-sedit="${e.id}"><span class="slog-d">${niceDate(e.date, { weekday: 'short', month: 'short', day: 'numeric' })}</span><span class="slog-t">${tStr(e.bed)} → ${tStr(e.wake)}</span><span class="slog-dur">${durStr(asleepMin(e))}</span><span class="slog-bar"><i style="width:${clamp(asleepMin(e) / (goal * 1.25) * 100, 0, 100)}%"></i><em style="left:${80}%"></em></span><span class="slog-sc" style="background:${seq(sc / 100)}">${sc}</span><span class="slog-tags">${(e.tags || []).slice(0, 3).map(t => `<span class="chip">${esc(t)}</span>`).join('')}</span></button>`; }).join('') || '<div class="empty">No nights yet.</div>'}</div>
     </div>
   </div>`;
 }
-CHARTS.sleepWin = w => {
-  const n = ui.sRange, t = todayStr();
-  const days = Array.from({ length: n }, (_, i) => addDays(t, i - n + 1));
-  const byDate = Object.fromEntries(S.sleep.map(e => [e.date, e]));
-  const nights = days.map(d => byDate[d]).filter(Boolean);
-  const gB = relBed(S.sleepCfg.bed), gW = gB + ((S.sleepCfg.wake - S.sleepCfg.bed + 1440) % 1440);
-  let lo = Math.min(gB, ...nights.map(e => relBed(e.bed))), hi = Math.max(gW, ...nights.map(e => relBed(e.bed) + inBedMin(e)));
-  lo = Math.floor((lo - 30) / 60) * 60; hi = Math.ceil((hi + 30) / 60) * 60;
-  const H = 280, padL = 52, padR = 10, padT = 10, padB = 26, cw = w - padL - padR, ch = H - padT - padB;
-  const y = m => padT + (m - lo) / (hi - lo) * ch, slot = cw / n, bw = Math.max(5, Math.min(22, slot * .55));
-  let g = `<rect x="${padL}" y="${y(gB)}" width="${cw}" height="${y(gW) - y(gB)}" fill="color-mix(in srgb, var(--accent) 8%, transparent)"/><line class="goal" x1="${padL}" x2="${padL + cw}" y1="${y(gB)}" y2="${y(gB)}"/><line class="goal" x1="${padL}" x2="${padL + cw}" y1="${y(gW)}" y2="${y(gW)}"/>`;
-  const stepH = (hi - lo) / 60 > 10 ? 120 : 60;
-  for (let m = lo; m <= hi; m += stepH) g += `<line class="g" x1="${padL}" x2="${padL + cw}" y1="${y(m)}" y2="${y(m)}"/><text x="${padL - 8}" y="${y(m) + 4}" text-anchor="end">${timeOf(m)}</text>`;
-  const lstep = Math.max(1, Math.ceil(n / Math.max(2, Math.floor(cw / 40))));
-  days.forEach((d, i) => {
-    const cx = padL + slot * i + slot / 2, e = byDate[d];
-    if (i % lstep === 0 || i === n - 1) g += `<text x="${cx}" y="${H - 6}" text-anchor="middle">${n <= 14 ? DOW[parse(d).getDay()].slice(0, 2) + ' ' : ''}${parse(d).getDate()}</text>`;
-    if (!e) return;
-    const b = relBed(e.bed), wk = b + inBedMin(e), sc = sleepScore(e), sl = b + (e.lat || 0);
-    const tip = `<b>${niceDate(d, { weekday: 'short', month: 'short', day: 'numeric' })}</b><br>${tStr(e.bed)} → ${tStr(e.wake)}<br>${durStr(asleepMin(e))} asleep · ${durStr(inBedMin(e))} in bed<br>Score <b>${sc}</b> · ${scoreWord(sc)}`;
-    g += `<g class="hitg" ${tipAttr(tip)}><rect class="hit" x="${padL + slot * i}" y="${padT}" width="${slot}" height="${ch}"/>
-      <rect x="${cx - bw / 2}" y="${y(b)}" width="${bw}" height="${Math.max(2, y(sl) - y(b))}" rx="${Math.min(4, bw / 2)}" fill="var(--surface-2)" stroke="var(--border-strong)"/>
-      <rect x="${cx - bw / 2}" y="${y(sl)}" width="${bw}" height="${Math.max(2, y(wk) - y(sl))}" rx="${Math.min(4, bw / 2)}" fill="${seq(sc / 100)}"/></g>`;
-  });
-  return nights.length ? svgWrap(w, H, g) : '<div class="empty">Log a few nights to see your sleep windows.</div>';
-};
-CHARTS.sleepDur = w => {
-  const n = ui.sRange, t = todayStr(), goal = S.sleepCfg.goal;
-  const byDate = Object.fromEntries(S.sleep.map(e => [e.date, e]));
-  const days = Array.from({ length: n }, (_, i) => addDays(t, i - n + 1));
-  const bars = days.map(d => { const e = byDate[d]; const v = e ? asleepMin(e) / 60 : 0; return { v, ok: v >= goal - .25, label: parse(d).getDate(), tip: `<b>${niceDate(d, { weekday: 'short', month: 'short', day: 'numeric' })}</b><br>${e ? `${durStr(asleepMin(e))} asleep<br>${v >= goal ? 'met goal ✓' : `${durStr(Math.round((goal - v) * 60))} short`}` : 'Not logged'}` }; });
-  const mx = Math.max(10, Math.ceil(Math.max(...bars.map(b => b.v))));
-  return barsSVG(w, { bars, height: 220, yMax: mx, ticks: [0, 2, 4, 6, 8, 10].filter(x => x <= mx), fmtY: v => v + 'h', goal, goalLabel: `${goal}h goal`, hueFn: b => b.ok ? 'var(--accent)' : 'color-mix(in srgb, var(--accent) 42%, var(--surface-2))' });
-};
-CHARTS.sleepFactors = w => {
-  const f = factorImpact(sleepRange(Math.max(30, ui.sRange)));
-  if (!f.length) return '<div class="empty">Tag your nights (caffeine, exercise, screens…) and Lumen will find what helps and what hurts.</div>';
-  const rowH = 30, padL = 96, padR = 10, H = f.length * rowH + 8, cw = w - padL - padR, mid = padL + cw / 2;
-  const mx = Math.max(8, ...f.map(x => Math.abs(x.diff)));
-  const g = f.map((x, i) => {
-    const y = 4 + i * rowH, len = Math.abs(x.diff) / mx * (cw / 2 - 34), pos = x.diff >= 0; // 34px keeps value labels clear of the factor names
-    const tip = `<b>${esc(x.tag)}</b> · ${x.n} nights<br>avg score ${Math.round(x.with)} vs ${Math.round(x.without)} without<br>sleep ${x.dur >= 0 ? '+' : '−'}${durStr(Math.abs(Math.round(x.dur)))}`;
-    return `<g class="hitg" ${tipAttr(tip)}><rect class="hit" x="0" y="${y}" width="${w}" height="${rowH - 4}"/><text x="${padL - 10}" y="${y + rowH / 2 + 1}" text-anchor="end" class="lbl">${esc(x.tag)}</text>
-      <rect x="${pos ? mid + 1 : mid - len - 1}" y="${y + 6}" width="${Math.max(2, len)}" height="${rowH - 16}" rx="4" fill="${pos ? POS : NEG}"/>
-      <text class="dl" x="${pos ? mid + len + 6 : mid - len - 6}" y="${y + rowH / 2 + 1}" text-anchor="${pos ? 'start' : 'end'}">${pos ? '+' : '−'}${Math.round(Math.abs(x.diff))}</text></g>`;
-  }).join('');
-  return svgWrap(w, H, `<line x1="${mid}" x2="${mid}" y1="0" y2="${H}" stroke="var(--border-strong)"/>${g}`);
-};
-CHARTS.sleepDow = w => {
-  const list = sleepRange(60), goal = S.sleepCfg.goal, names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const bars = names.map((nm, i) => { const xs = list.filter(e => (parse(e.date).getDay() + 6) % 7 === i); const v = xs.length ? avg(xs.map(asleepMin)) / 60 : 0; return { v, ok: v >= goal - .25, label: nm, tip: `<b>${nm}</b> mornings<br>${xs.length ? `${durStr(Math.round(v * 60))} avg · ${xs.length} nights` : 'no data'}` }; });
-  return barsSVG(w, { bars, height: 200, yMax: 10, ticks: [0, 5, 10], fmtY: v => v + 'h', goal, goalLabel: `${goal}h`, hueFn: b => b.ok ? 'var(--accent)' : 'color-mix(in srgb, var(--accent) 42%, var(--surface-2))' });
-};
-CHARTS.sleepCal = w => {
-  const byDate = Object.fromEntries(S.sleep.map(e => [e.date, e]));
-  return heatmapSVG(w, { weeks: 26, cell: 16, val: d => byDate[d] ? sleepScore(byDate[d]) / 100 : null, tip: (d, v) => { const e = byDate[d]; return `<b>${niceDate(d, { weekday: 'short', month: 'short', day: 'numeric' })}</b><br>${e ? `Score ${sleepScore(e)} · ${durStr(asleepMin(e))}<br>${tStr(e.bed)} → ${tStr(e.wake)}` : 'Not logged'}`; } });
-};
 AFTER.sleep = () => {
   bindDemoBanner();
   $$('[data-srange]').forEach(b => b.onclick = () => { ui.sRange = +b.dataset.srange; saveUI(); render(); });
@@ -844,6 +675,7 @@ function afterDashExtras() {
   const t = todayStr();
   $$('[data-dh]').forEach(b => b.onclick = () => { const h = S.habits.find(x => x.id === b.dataset.dh); if (h.type === 'check' || hDone(h, t)) hTap(h, t); else hStep(h, t, 1); render(); });
   const l = $('#dsLog'); if (l) l.onclick = () => openSleepEditor();
+  drawCharts($('#main'));
   bindLiveSleep();
 }
 

@@ -373,9 +373,6 @@ function renderDashboard() {
   const R = 52, C = 2 * Math.PI * R;
   const ring = pct => `<svg width="120" height="120" viewBox="0 0 120 120"><circle cx="60" cy="60" r="${R}" fill="none" stroke="var(--surface-2)" stroke-width="9"/><circle cx="60" cy="60" r="${R}" fill="none" stroke="url(#rg)" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - pct / 100)}"/><defs><linearGradient id="rg"><stop offset="0" stop-color="var(--accent)"/><stop offset="1" stop-color="var(--accent-2)"/></linearGradient></defs></svg>`;
 
-  // last 7 days focus chart
-  const week = Array.from({ length: 7 }, (_, i) => { const d = addDays(t, i - 6); const s = dayStats(d); return { d, ...s }; });
-  const maxW = Math.max(60, ...week.map(w => w.planned));
 
   const blockRow = b => {
     const c = cat(b.cat).color;
@@ -437,8 +434,8 @@ function renderDashboard() {
     </div>
 
     <div class="card span-7">
-      <div class="card-h"><span class="card-t">${icon('sparkle')} Focus hours · last 7 days</span><span class="faint" style="font-size:12px">light = planned · bright = done</span></div>
-      <div class="week-bars">${week.map(w => `<div class="wb ${w.d === t ? 'today' : ''}" title="${durStr(w.done)} done of ${durStr(w.planned)}"><div class="col"><i class="plan" style="height:${(w.planned / maxW) * 100}%"></i><i class="done" style="height:${(w.done / maxW) * 100}%"></i></div><span>${DOW[parse(w.d).getDay()]}</span></div>`).join('')}</div>
+      ${chartHead('focusWeek', 'Focus hours · last 7 days', 'sparkle')}
+      <div data-chart="focusWeek"></div>
     </div>
 
     <div class="card span-5">
